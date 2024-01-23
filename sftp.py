@@ -1,17 +1,18 @@
 import os
-import paramiko
 import csv
 import socket
 import logging
 from dotenv import load_dotenv
+from typing import List
+
+import paramiko
 
 MAX_RETRIES = 3
 
-dotenv_path = ".env"
-if os.path.exists(dotenv_path):
-    load_dotenv(dotenv_path)
+# Load environment variables from .env file
+load_dotenv()
 
-def validate_private_key(private_key_path):
+def validate_private_key(private_key_path: str) -> bool:
     """
     Validates the private key file.
 
@@ -22,12 +23,13 @@ def validate_private_key(private_key_path):
     - bool: True if the private key is valid, False otherwise.
     """
     try:
-        private_key = paramiko.RSAKey(filename=private_key_path)
-        return True
-    except paramiko.ssh_exception.SSHException:
+        with open(private_key_path, 'r') as key_file:
+            paramiko.RSAKey(filename=private_key_path)
+            return True
+    except (FileNotFoundError, paramiko.ssh_exception.SSHException):
         return False
 
-def is_host_reachable(host, port=22):
+def is_host_reachable(host: str, port: int = 22) -> bool:
     """
     Checks if the specified host is reachable.
 
@@ -44,19 +46,22 @@ def is_host_reachable(host, port=22):
     except (ConnectionRefusedError, socket.gaierror):
         return False
 
-def setup_logging(log_level):
+def setup_logging(log_level: int = logging.INFO) -> None:
     """
-    Configures logging to the console with the INFO level.
-    """
-    logging.basicConfig(level=log_level)
+    Configures logging to the console with the specified log level.
 
-def sftp_transfer(host, port, username, private_key_path, file_list_path):
+    Parameters:
+    - log_level (int): Logging level (default is logging.INFO).
+    """
+    logging.basicConfig(level=log_level, format="%(asctime)s %(levelname)s %(message)s")
+
+def sftp_transfer(host: str, username: str, private_key_path: str, file_list_path: str, port: int = 22) -> None:
     """
     Performs SFTP file transfer to the specified host.
 
     Parameters:
     - host (str): Hostname or IP address.
-    - port (int): Port number.
+    - port (int): Port number (default is 22).
     - username (str): Username for authentication.
     - private_key_path (str): Path to the private key file for authentication.
     - file_list_path (str): Path to the file containing the list of files to transfer.
@@ -69,63 +74,59 @@ def sftp_transfer(host, port, username, private_key_path, file_list_path):
         logging.error("Host is not reachable.")
         return
 
-    ssh_client = paramiko.SSHClient()
-    ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    ssh = paramiko.SSHClient()
+    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
     try:
-        ssh_client.connect(host, port=port, username=username, key_filename=private_key_path)
-    except paramiko.ssh_exception.AuthenticationException:
+        ssh.connect(host, port=port, username=username, pkey=paramiko.RSAKey(filename=private_key_path))
+    except paramiko.AuthenticationException:
         logging.error("Authentication error.")
         return
-    except paramiko.ssh_exception.SSHException:
-        logging.error("SSH error.")
-        return
-    except Exception as e:
+    except paramiko.SSHException as e:
         logging.error(f"Error connecting via SSH: {e}")
         return
 
-    sftp = ssh_client.open_sftp()
+    try:
+        with ssh.open_sftp() as sftp:
+            with open(file_list_path, 'r') as file:
+                csv_reader = csv.DictReader(file)
+                for row in csv_reader:
+                    source, destination = row['Source'], row['Destination']
 
-    with open(file_list_path, 'r') as file:
-        csv_reader = csv.DictReader(file)
-        for row in csv_reader:
-            source = row['Source']
-            destination = row['Destination']
-            retry_count = 0
-            logging.info(f"CSV read file {source} to {destination}")
+                    for retry_count in range(MAX_RETRIES):
+                        try:
+                            sftp.get(source, destination)
+                            logging.info(f"Successfully transferred {source} to {destination}")
+                            break
+                        except (FileNotFoundError, PermissionError, IOError) as e:
+                            logging.error(f"Error transferring file {source}: {e}")
+                        except Exception as e:
+                            logging.error(f"Unexpected error transferring file {source}: {e}")
+        logging.info("SFTP transfer completed successfully.")
+    finally:
+        ssh.close()
 
-            while retry_count < MAX_RETRIES:
-                try:
-                    sftp.get(source, destination)
-                    logging.info(f"File {source} transferred to {destination}")
-                    break
-                except FileNotFoundError as e:
-                    logging.error(f"File not found: {e}")
-                except PermissionError as e:
-                    logging.error(f"Permission error: {e}")
-                except IOError as e:
-                    logging.error(f"I/O error: {e}")
-                except Exception as e:
-                    logging.error(f"Error transferring file {source}: {e}")
-                retry_count += 1
-                
-            if retry_count == MAX_RETRIES:
-                logging.error(f"The file {source} failed after {MAX_RETRIES} retries.")
+def check_env_variables(required_vars: List[str]) -> None:
+    """
+    Checks if all required environment variables are set.
 
-    sftp.close()
-    ssh_client.close()
+    Parameters:
+    - required_vars (List[str]): List of required environment variable names.
 
-if __name__ == "__main__":
-    required_env_variables = ["SFTP_HOST", "SFTP_USERNAME", "SFTP_PRIVATE_KEY_PATH", "SFTP_FILE_LIST_PATH"]
-
-    # Check if all required environment variables are set
-    missing_variables = [var for var in required_env_variables if not os.getenv(var)]
-
+    Raises:
+    - ValueError: If any required variable is missing.
+    """
+    missing_variables = [var for var in required_vars if not os.getenv(var)]
     if missing_variables:
         error_message = f"Missing required environment variables: {', '.join(missing_variables)}"
         logging.error(error_message)
         raise ValueError(error_message)
-    
+
+if __name__ == "__main__":
+    required_env_variables = ["SFTP_HOST", "SFTP_USERNAME", "SFTP_PRIVATE_KEY_PATH", "SFTP_FILE_LIST_PATH"]
+
+    check_env_variables(required_env_variables)
+
     host = os.getenv("SFTP_HOST")
     port = int(os.getenv("SFTP_PORT", 22))
     username = os.getenv("SFTP_USERNAME")
@@ -136,7 +137,7 @@ if __name__ == "__main__":
     setup_logging(log_level)
 
     try:
-        sftp_transfer(host, port, username, private_key_path, file_list_path)
+        sftp_transfer(host, username, private_key_path, file_list_path, port)
     except KeyboardInterrupt:
         logging.info("Script interrupted by user.")
     except Exception as e:
