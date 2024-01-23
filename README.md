@@ -96,6 +96,13 @@ Ensure that the `SFTP_FILE_LIST_PATH` environment variable points to the locatio
 
 The utility also includes a Dockerfile for containerization. To build and run the utility as a Docker container, use the following commands:
 
+Alternatively, you can pull the pre-built image from Docker Hub using the following command:
+
+```bash
+docker pull lkis/tiny-sftp
+```
+
+
 ```bash
 # Build the Docker image
 docker build -t tiny-sftp .
