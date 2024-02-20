@@ -34,6 +34,7 @@ The utility can be configured using the following environment variables:
 - `SFTP_PRIVATE_KEY_PATH`: The path to the private key file for SFTP authentication.
 - `SFTP_FILE_LIST_PATH`: The path to the file containing the list of files to transfer.
 - `LOG_LEVEL`: The logging level (e.g., INFO, ERROR, DEBUG).
+- `PREFERRED_KEY_ALGORITHM` : Public key algorithms supported by the client if provided
 
 ## Usage
 
@@ -107,7 +108,7 @@ docker pull lkis/tiny-sftp
 # Build the Docker image
 docker build -t tiny-sftp .
 ```
-The Dockerfile has been updated to use Python 3.8-slim as the base image and to copy the necessary files for the SFTP transfer. The CMD and ENTRYPOINT instructions have been set to execute the `sftp.py` script.
+The Dockerfile has been updated to use Python 3.12-slim as the base image and to copy the necessary files for the SFTP transfer. The CMD and ENTRYPOINT instructions have been set to execute the `sftp.py` script.
 Replace `.env` with the path to your environment file if necessary.
 
 ## Setting Up Rebex Tiny SFTP Server for Testing with Key-Based Authentication
