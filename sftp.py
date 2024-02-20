@@ -77,15 +77,13 @@ def sftp_transfer(host: str, username: str, private_key_path: str, file_list_pat
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     
-    private_key = paramiko.RSAKey(filename=private_key_path)
-    
-    # Force the preferred key algorithm only if the variable is provided
-    if preferred_key_algorithm:
-        logging.info('preferred_key_algorithm : ' + preferred_key_algorithm)
-        private_key.key_algorithm = preferred_key_algorithm
-
     try:
-        ssh.connect(host, port=port, username=username, pkey=private_key)
+        if disabled_algorithms :
+            logging.info(f"disabled_algorithms=" + disabled_algorithms)
+            ssh.connect(host, port=port, username=username, pkey=paramiko.RSAKey(filename=private_key_path),
+                        disabled_algorithms=dict(pubkeys=disabled_algorithms))
+        else :
+            ssh.connect(host, port=port, username=username, pkey=paramiko.RSAKey(filename=private_key_path))
     except paramiko.AuthenticationException:
         logging.error("Authentication error.")
         return
@@ -140,7 +138,7 @@ if __name__ == "__main__":
     private_key_path = os.getenv("SFTP_PRIVATE_KEY_PATH")
     file_list_path = os.getenv("SFTP_FILE_LIST_PATH")
     log_level = getattr(logging, os.getenv("LOG_LEVEL", "INFO").upper())
-    preferred_key_algorithm = os.getenv("PREFERRED_KEY_ALGORITHM")
+    disabled_algorithms = os.getenv("DISABLE_ALGORITHM")
 
 
     setup_logging(log_level)

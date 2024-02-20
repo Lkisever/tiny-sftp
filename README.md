@@ -34,7 +34,7 @@ The utility can be configured using the following environment variables:
 - `SFTP_PRIVATE_KEY_PATH`: The path to the private key file for SFTP authentication.
 - `SFTP_FILE_LIST_PATH`: The path to the file containing the list of files to transfer.
 - `LOG_LEVEL`: The logging level (e.g., INFO, ERROR, DEBUG).
-- `PREFERRED_KEY_ALGORITHM` : Public key algorithms supported by the client if provided
+- `DISABLE_ALGORITHM` : In case of malfunction/absence of server-sig-algs extension on the server side, the list of disables algorithms
 
 ## Usage
 
@@ -68,6 +68,7 @@ SFTP_USERNAME=user
 SFTP_PRIVATE_KEY_PATH=/data/private_key.pem
 SFTP_FILE_LIST_PATH=/data/list.txt
 LOG_LEVEL=INFO
+DISABLE_ALGORITHM=rsa-sha2-512,rsa-sha2-256
 ```
 
 Replace the values with your actual SFTP server details and file paths.
